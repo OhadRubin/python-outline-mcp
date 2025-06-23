@@ -1,0 +1,2 @@
+ast-grep-py>=0.38.0
+fastmcp>=2.8.0
