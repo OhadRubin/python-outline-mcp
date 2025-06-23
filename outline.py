@@ -3,12 +3,51 @@
 
 import sys
 import os
+import subprocess
 from pathlib import Path
 from ast_grep_py import SgRoot
 from fastmcp import FastMCP
 
 
-def generate_outline(file_path: str, show_filename: bool = True) -> str:
+def is_git_repo(path: str) -> bool:
+    """Check if the given path is within a git repository"""
+    try:
+        subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=path,
+            capture_output=True,
+            check=True,
+            timeout=5
+        )
+        return True
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
+def get_git_python_files(path: str, recursive: bool = True) -> list[Path]:
+    """Get Python files tracked by git, respecting .gitignore"""
+    try:
+        cmd = ["git", "ls-files", "*.py"]
+        if recursive:
+            cmd.append("**/*.py")
+        
+        result = subprocess.run(
+            cmd,
+            cwd=path,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10
+        )
+        
+        # Convert relative paths to absolute Path objects
+        base_path = Path(path)
+        return [base_path / file_path for file_path in result.stdout.strip().split('\n') if file_path]
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return []
+
+
+def generate_outline(file_path: str, show_filename: bool = True):
     """Generate outline showing only functions and classes with methods"""
     try:
         with open(file_path, "r") as f:
@@ -71,7 +110,7 @@ def generate_outline(file_path: str, show_filename: bool = True) -> str:
     return "\n".join(output) if output else "📄 No functions or classes found"
 
 
-def process_folder(folder_path: str, recursive: bool = True) -> str:
+def process_folder(folder_path: str, recursive: bool = True, filter_gitignore: bool = True) -> str:
     """Process all Python files in a folder"""
     folder = Path(folder_path)
 
@@ -81,16 +120,22 @@ def process_folder(folder_path: str, recursive: bool = True) -> str:
     if not folder.is_dir():
         return f"❌ Not a directory: {folder_path}"
 
-    # Find all Python files
-    if recursive:
-        python_files = list(folder.rglob("*.py"))
+    # Find Python files - use git if available and filter_gitignore is True
+    if filter_gitignore and is_git_repo(str(folder)):
+        python_files = get_git_python_files(str(folder), recursive)
+        source = "git-tracked"
     else:
-        python_files = list(folder.glob("*.py"))
+        # Fallback to filesystem glob
+        if recursive:
+            python_files = list(folder.rglob("*.py"))
+        else:
+            python_files = list(folder.glob("*.py"))
+        source = "filesystem"
 
     if not python_files:
         return f"❌ No Python files found in: {folder_path}"
 
-    output = [f"🔍 Found {len(python_files)} Python files\n"]
+    output = [f"🔍 Found {len(python_files)} Python files ({source})\n"]
 
     for py_file in sorted(python_files):
         try:
@@ -108,11 +153,13 @@ mcp = FastMCP("Python Outline Generator 🐍")
 
 
 @mcp.tool
-def python_outline(path: str, recursive: bool = True) -> str:
+def python_outline(path: str, recursive: bool = True, filter_gitignore: bool = True) -> str:
     """Generate a Python code outline showing functions and classes with line numbers.
     
     Args:
         path: Path to a Python file or directory
+        recursive: Search recursively in subdirectories (default: True)
+        filter_gitignore: Respect .gitignore when in a git repository (default: True)
         
     Returns:
         Formatted outline showing functions and classes with line ranges
@@ -120,7 +167,7 @@ def python_outline(path: str, recursive: bool = True) -> str:
     if os.path.isfile(path):
         return generate_outline(path, show_filename=True)
     elif os.path.isdir(path):
-        return process_folder(path, recursive=recursive)
+        return process_folder(path, recursive=recursive, filter_gitignore=filter_gitignore)
     else:
         return f"❌ Path not found: {path}"
 
