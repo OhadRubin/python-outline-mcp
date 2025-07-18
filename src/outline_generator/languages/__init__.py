@@ -1,0 +1,1 @@
+"""Language-specific pattern definitions."""
