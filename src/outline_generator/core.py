@@ -51,7 +51,7 @@ class OutlineGenerator:
     def __init__(self, language_config: LanguageConfig):
         self.config = language_config
     
-    def generate_file_outline(self, file_path: str, show_filename: bool = True) -> str:
+    def generate_file_outline(self, file_path: str, show_filename: bool = True, base_path: str = None) -> str:
         """Generate outline showing only functions and classes with methods."""
         content, error = safe_read_file(file_path)
         if error:
@@ -63,7 +63,7 @@ class OutlineGenerator:
         output = []
         
         if show_filename:
-            filename_header = format_filename(file_path, show_filename)
+            filename_header = format_filename(file_path, show_filename, base_path)
             if filename_header:
                 output.append(filename_header)
         
@@ -120,7 +120,8 @@ class OutlineGenerator:
         
         for file_path in sorted(files):
             try:
-                outline = self.generate_file_outline(str(file_path), show_filename=True)
+                # Use current working directory as base path for relative paths
+                outline = self.generate_file_outline(str(file_path), show_filename=True, base_path=os.getcwd())
                 output.append(outline)
                 output.append("")  # Empty line between files
             except Exception as e:
@@ -131,7 +132,8 @@ class OutlineGenerator:
     def generate_outline(self, path: str, recursive: bool = True, filter_gitignore: bool = True) -> str:
         """Generate outline for a file or directory."""
         if os.path.isfile(path):
-            return self.generate_file_outline(path, show_filename=True)
+            # Use current working directory as base path for relative paths
+            return self.generate_file_outline(path, show_filename=True, base_path=os.getcwd())
         elif os.path.isdir(path):
             return self.process_folder(path, recursive=recursive, filter_gitignore=filter_gitignore)
         else:
