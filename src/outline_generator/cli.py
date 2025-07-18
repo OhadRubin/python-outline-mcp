@@ -57,7 +57,7 @@ Examples:
     )
     
     parser.add_argument(
-        "--lang", "--language",
+        "--lang", "--language", "-l",
         dest="language",
         default="python",
         help="Programming language (default: python). Available: " + ", ".join(LANGUAGE_CONFIGS.keys())
